@@ -2,11 +2,16 @@ require "chrome_remote/web_socket_client"
 
 module ChromeRemote
   class Client
-    attr_reader :ws, :handlers
+    attr_reader :ws, :options, :handlers, :target_id
 
-    def initialize(ws_url)
-      @ws = WebSocketClient.new(ws_url)
+    def initialize(options)
+      @options = options
+      @ws = WebSocketClient.new(get_ws_url)
       @handlers = Hash.new { |hash, key| hash[key] = [] }
+    end
+
+    def destroy
+      Net::HTTP.get(@options[:host], "/json/close/#{@target_id}", @options[:port])
     end
 
     def send_cmd(command, params = {})
@@ -40,6 +45,17 @@ module ChromeRemote
     end
 
     private
+
+    def get_ws_url
+      response = Net::HTTP.get(@options[:host], "/json/new?", @options[:port])
+      # TODO handle unsuccesful request
+
+      response = JSON.parse(response)
+      @target_id = response["id"]
+
+      # TODO handle no entry found
+      response["webSocketDebuggerUrl"]
+    end
 
     def generate_unique_id
       @last_id ||= 0
